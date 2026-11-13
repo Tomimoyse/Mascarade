@@ -6,8 +6,8 @@ movimiento de cada ficha lo decide la **carta de disfraz** que juegas sobre ella
 
 Hecho con [LÖVE2D](https://love2d.org/) 11.5 y Lua.
 
-> **Estado: Fase 1 (base técnica).** El motor, el escalado, los shaders y los
-> efectos están listos. Las reglas del juego llegan en la Fase 2.
+> **Estado: Fase 2 (lógica de las reglas).** El motor gráfico y las reglas
+> completas están listos y probados. La interfaz de partida llega en la Fase 3.
 
 ---
 
@@ -38,6 +38,17 @@ love .
 love . --state game          # arranca directamente en una pantalla
 love . --shot 2.0            # espera 2 s, guarda una captura y sale
 love . --state game --shot 3 # combinables
+love . --test                # ejecuta la suite de reglas y sale
+love . --demo 7 40           # juega una partida por consola (semilla, turnos)
+```
+
+### Pruebas de las reglas
+
+Las reglas son Lua puro, así que se pueden probar sin LÖVE:
+
+```bash
+lua tests/run.lua        # 394 comprobaciones
+lua tests/demo.lua 7 40  # partida de demostración por consola
 ```
 
 Las capturas van al directorio de guardado de LÖVE
@@ -83,7 +94,12 @@ src/
   screen.lua          Canvas interno 640x360, escala entera y letterbox
   postfx.lua          Cadena de postprocesado: bloom + CRT
 
-  game/               Lógica pura de las reglas (Fase 2). Sin love.graphics.
+  game/               Lógica pura de las reglas. Sin love.graphics.
+    rng.lua               PRNG determinista (Park-Miller)
+    cards.lua             Composición del mazo de 32 disfraces
+    board.lua             Tablero 8x8 y fichas
+    moves.lua             Movimientos legales por tipo de disfraz
+    match.lua             Turnos, acciones, encadenado y fin de partida
   states/             Pantallas: menu, game, options, rules, pause
   ui/                 Widgets: panel, button, text, layout, sprites, boardview
   fx/                 Efectos: background, shake, particles, floatingtext
@@ -94,7 +110,10 @@ assets/
   shaders/            background, brightpass, blur, crt (GLSL)
 
 locale/es.lua         Todos los textos visibles del juego
-tests/                Pruebas de las reglas por consola (Fase 2)
+tests/
+  run.lua             Suite de pruebas de las reglas
+  demo.lua            Partida de demostración por consola
+  helpers.lua         Montaje de posiciones concretas para los tests
 ```
 
 ### Decisiones de arquitectura
@@ -121,3 +140,18 @@ tests/                Pruebas de las reglas por consola (Fase 2)
 - Librerías `classic` y `flux` de [rxi](https://github.com/rxi), `hump` de
   [vrld](https://github.com/vrld), todas MIT.
 - El resto del código y de los recursos son originales de este proyecto.
+
+---
+
+## Reglas de la casa
+
+Dos reglas que **no** están en el documento de diseño original y se añadieron
+para cerrar huecos. Están marcadas aquí para que queden explícitas:
+
+- **Carta muerta.** Una vez por turno, gratis y sin gastar la acción, puedes
+  descartar una carta cuyo disfraz no tenga ningún movimiento legal con ninguna
+  de tus fichas, y robar una de reemplazo. Evita quedarte atascado con la mano
+  llena de cartas injugables.
+- **Tablas.** Si pasan 30 turnos seguidos (15 por jugador) sin ninguna captura,
+  la partida se declara en tablas. El número está en
+  `Config.DRAW_TURNS_WITHOUT_CAPTURE`.

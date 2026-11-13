@@ -45,6 +45,16 @@ function love.load(args)
             shot.delay = tonumber(args[i + 1]) or 1.5
         elseif a == "--state" then
             startState = args[i + 1] or "menu"
+        elseif a == "--test" then
+            -- Ejecuta la suite de reglas por consola y sale.
+            require("tests.run")
+            return
+        elseif a == "--demo" then
+            -- Juega una partida aleatoria por consola y sale.
+            _G.arg = { args[i + 1], args[i + 2] }
+            require("tests.demo")
+            love.event.quit()
+            return
         end
     end
 
