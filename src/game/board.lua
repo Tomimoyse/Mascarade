@@ -130,6 +130,29 @@ function Board:spawn(owner, col, row)
     return piece
 end
 
+-- Reconstruye un tablero a partir de una lista de fichas con su id original.
+-- La usa la vista remota para rehacer el tablero desde una foto del estado.
+function Board.restore(list)
+    local board = Board.new()
+    local maxId = 0
+    for _, spec in ipairs(list or {}) do
+        local piece = {
+            id       = spec.id,
+            owner    = spec.owner,
+            col      = spec.col,
+            row      = spec.row,
+            hasMoved = spec.hasMoved and true or false,
+            isKing   = spec.isKing and true or false,
+        }
+        board.grid[(piece.row - 1) * N + piece.col] = piece
+        board.byId[piece.id] = piece
+        board.count[piece.owner] = board.count[piece.owner] + 1
+        if piece.id > maxId then maxId = piece.id end
+    end
+    board.nextId = maxId + 1
+    return board
+end
+
 function Board:remove(piece)
     if not piece or not self.byId[piece.id] then return false end
     self.grid[key(piece.col, piece.row)] = nil

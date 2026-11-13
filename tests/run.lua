@@ -786,6 +786,208 @@ test("las coordenadas del raton se traducen a la caja de diseno", function()
 end)
 
 ---------------------------------------------------------------------------
+section("Red: serializacion")
+---------------------------------------------------------------------------
+
+test("el codec va y vuelve sin perder nada", function()
+    local Codec = require("src.net.codec")
+    local original = {
+        type = "playCard", cardId = 7, pieceId = 12, col = 4, row = 5,
+        flags = { true, false }, nombre = "Jugador 1", vacio = "",
+        anidado = { a = { b = { c = -3.5 } } },
+    }
+    local vuelta = Codec.decode(Codec.encode(original))
+    eq(vuelta.type, "playCard", "cadena")
+    eq(vuelta.cardId, 7, "numero")
+    eq(vuelta.anidado.a.b.c, -3.5, "numero negativo anidado")
+    eq(vuelta.flags[1], true, "booleano verdadero")
+    eq(vuelta.flags[2], false, "booleano falso")
+    eq(vuelta.vacio, "", "cadena vacia")
+end)
+
+test("el codec rechaza cualquier entrada malformada sin caerse", function()
+    local Codec = require("src.net.codec")
+    local malas = { "", "x", "n;", "nabc;", "s5:ab", "s-1:x", "t", "tz",
+                    "b2", "z z", string.rep("t", 80), "n1;sobra" }
+    for _, mala in ipairs(malas) do
+        local v, err = Codec.decode(mala)
+        ok(v == nil and err ~= nil, "rechaza [" .. mala:sub(1, 12) .. "]")
+    end
+end)
+
+test("el codec no ejecuta nada de lo que recibe", function()
+    local Codec = require("src.net.codec")
+    -- Una carga que seria peligrosa si deserializaramos con load().
+    local payload = [[os.execute("rm -rf /tmp/x")]]
+    local cable = "s" .. #payload .. ":" .. payload
+    local v = Codec.decode(cable)
+    eq(type(v), "string", "llega como texto plano")
+    eq(v, payload, "y tal cual, sin interpretar")
+
+    -- Tambien va y vuelve por el camino normal.
+    eq(Codec.decode(Codec.encode(payload)), payload, "ida y vuelta intacta")
+
+    -- Y una cadena con la longitud mal declarada se rechaza.
+    ok(Codec.decode("s99:" .. payload) == nil, "rechaza longitudes que no cuadran")
+end)
+
+---------------------------------------------------------------------------
+section("Red: informacion oculta")
+---------------------------------------------------------------------------
+
+-- Recorre una estructura buscando un valor. Lo usamos para demostrar que
+-- cierta informacion NO viaja.
+local function contieneValor(t, buscado, visto)
+    visto = visto or {}
+    if t == buscado then return true end
+    if type(t) ~= "table" or visto[t] then return false end
+    visto[t] = true
+    for k, v in pairs(t) do
+        if contieneValor(k, buscado, visto) then return true end
+        if contieneValor(v, buscado, visto) then return true end
+    end
+    return false
+end
+
+test("la foto para un jugador no lleva las cartas del rival", function()
+    local Redact = require("src.net.redact")
+    local m = H.scenario({
+        pieces = { { owner = 1, col = 4, row = 5 }, { owner = 2, col = 4, row = 2 } },
+        hands = { [1] = { "torre", "peon" }, [2] = { "reina", "rey" } },
+        discard = { "alfil" },
+    })
+
+    local snap = Redact.snapshot(m, 1)
+    ok(snap.hands[1].cards ~= nil, "lleva mi mano")
+    eq(#snap.hands[1].cards, 2, "con mis dos cartas")
+    ok(snap.hands[2].cards == nil, "NO lleva la mano del rival")
+    eq(snap.hands[2].count, 2, "solo cuantas tiene")
+
+    -- Ningun id de las cartas del rival aparece en ninguna parte de la foto.
+    for _, carta in ipairs(m.players[2].hand) do
+        ok(not contieneValor(snap, carta.id),
+            "el id " .. carta.id .. " del rival no viaja")
+    end
+
+    -- Y lo mismo una vez serializada.
+    local Codec = require("src.net.codec")
+    local cable = Codec.encode(snap)
+    for _, carta in ipairs(m.players[2].hand) do
+        ok(not cable:find("n" .. carta.id .. ";", 1, true),
+            "el id " .. carta.id .. " tampoco viaja por el cable")
+    end
+end)
+
+test("los eventos de robo se censuran para el rival", function()
+    local Redact = require("src.net.redact")
+    local eventos = {
+        { t = "drew", player = 1, count = 2,
+          cards = { { id = 10, kind = "reina" }, { id = 11, kind = "rey" } } },
+        { t = "pieceMoved", pieceId = 3, col = 1, row = 1 },
+    }
+
+    local mios = Redact.events(eventos, 1)
+    eq(#mios[1].cards, 2, "yo si veo lo que robo")
+
+    local suyos = Redact.events(eventos, 2)
+    eq(suyos[1].count, 2, "el rival ve cuantas robo")
+    eq(#suyos[1].cards, 0, "pero no cuales")
+    ok(not contieneValor(suyos, 10), "ni el id de la reina")
+    eq(suyos[2].t, "pieceMoved", "los eventos publicos pasan tal cual")
+end)
+
+---------------------------------------------------------------------------
+section("Red: vista remota")
+---------------------------------------------------------------------------
+
+test("la vista remota responde igual que el motor sobre lo publico", function()
+    local Redact    = require("src.net.redact")
+    local Codec     = require("src.net.codec")
+    local MatchView = require("src.session.matchview")
+
+    local m, p = H.scenario({
+        pieces = {
+            { owner = 1, col = 4, row = 5, name = "a", moved = true },
+            { owner = 1, col = 8, row = 8, name = "rey", king = true, moved = true },
+            { owner = 2, col = 4, row = 3, name = "v1" },
+            { owner = 2, col = 1, row = 1, name = "v2" },
+        },
+        hands = { [1] = { "torre", "alfil" }, [2] = { "reina" } },
+        discard = { "peon", "caballo" },
+        deck = { "peon", "peon", "peon" },
+    })
+
+    -- Viaje completo: foto -> cable -> vista.
+    local snap = Redact.snapshot(m, 1)
+    local vista = MatchView.fromSnapshot(Codec.decode(Codec.encode(snap)), 1)
+
+    eq(vista.current, m.current, "mismo jugador activo")
+    eq(vista.phase, m.phase, "misma fase")
+    eq(vista.board:countOf(1), m.board:countOf(1), "mis fichas")
+    eq(vista.board:countOf(2), m.board:countOf(2), "las del rival")
+    eq(#vista.deck, #m.deck, "cuantas cartas quedan en el mazo")
+    eq(#vista.discard, #m.discard, "el descarte entero")
+    eq(vista.board:kingOf(1).id, m.board:kingOf(1).id, "mi rey coronado")
+
+    -- La mano del rival existe en numero, pero tapada.
+    eq(#vista.players[2].hand, #m.players[2].hand, "cuenta bien sus cartas")
+    eq(vista.players[2].hand[1].kind, "?", "pero estan tapadas")
+
+    -- Las consultas de reglas dan lo mismo.
+    local carta = H.card(m, 1, "torre")
+    local vistaCarta
+    for _, c in ipairs(vista.players[1].hand) do
+        if c.kind == "torre" then vistaCarta = c end
+    end
+    ok(vistaCarta ~= nil, "mi torre esta en la vista")
+    eq(vistaCarta.id, carta.id, "con su id real")
+
+    eq(#vista:getMovablePieces(carta.id), #m:getMovablePieces(carta.id),
+        "mismas fichas movibles")
+    eq(#vista:getDestinations(carta.id, p.a.id), #m:getDestinations(carta.id, p.a.id),
+        "mismos destinos")
+    eq(vista:getEndTurnDrawCount(), m:getEndTurnDrawCount(), "mismo robo al pasar")
+    eq(tostring(vista:canFreeKingMove()), tostring(m:canFreeKingMove()),
+        "mismo veredicto sobre el rey gratis")
+    eq(#vista:getPlayableCards(), #m:getPlayableCards(), "mismas cartas jugables")
+end)
+
+test("la vista remota se niega a aplicar acciones en local", function()
+    local Redact    = require("src.net.redact")
+    local MatchView = require("src.session.matchview")
+    local m = H.scenario({
+        pieces = { { owner = 1, col = 4, row = 5 }, { owner = 2, col = 1, row = 1 } },
+        hands = { [1] = { "torre" } },
+    })
+    local vista = MatchView.fromSnapshot(Redact.snapshot(m, 1), 1)
+    local okApply, err = vista:apply({ type = "endTurn" })
+    ok(not okApply, "no deja mutar la vista")
+    eq(err, "partidaRemota", "y dice por que")
+end)
+
+test("la cadena del turno llega intacta a la vista remota", function()
+    local Redact    = require("src.net.redact")
+    local MatchView = require("src.session.matchview")
+    local m, p = H.scenario({
+        pieces = {
+            { owner = 1, col = 4, row = 5, name = "a", moved = true },
+            { owner = 2, col = 4, row = 3, name = "v" },
+            { owner = 2, col = 8, row = 8, name = "escolta" },
+        },
+        hands = { [1] = { "torre", "alfil" } },
+    })
+    ok(H.play(m, "torre", p.a, 4, 3), "come y encadena")
+
+    local vista = MatchView.fromSnapshot(Redact.snapshot(m, 1), 1)
+    eq(vista.turn.lastKind, "torre", "sabe cual fue el ultimo disfraz")
+    eq(vista.turn.playedByKind.torre, 1, "y cuantos lleva")
+    eq(vista.turn.lockedPieceId, p.a.id, "y que ficha ha quedado fijada")
+    eq(#vista:getPlayedThisTurn(), 1, "ve la carta jugada este turno")
+    eq(vista:getPlayedThisTurn()[1].kind, "torre", "y cual es")
+    eq(#vista.discard, 0, "que todavia no esta en el descarte")
+end)
+
+---------------------------------------------------------------------------
 section("Partida completa aleatoria")
 ---------------------------------------------------------------------------
 
