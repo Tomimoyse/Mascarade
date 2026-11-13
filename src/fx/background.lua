@@ -1,7 +1,7 @@
 -- Fondo animado con el shader de remolino psicodélico.
 -- Cada pantalla puede pedir su propia tríada de colores y su intensidad.
 
-local Config  = require("src.config")
+local Screen  = require("src.screen")
 local Palette = require("src.palette")
 
 local Background = {}
@@ -25,7 +25,6 @@ local intensity = 1
 
 function Background.load()
     shader = love.graphics.newShader("assets/shaders/background.glsl")
-    shader:send("uRes", { Config.CANVAS_W, Config.CANVAS_H })
     Background.setMood("menu", true)
 end
 
@@ -64,6 +63,8 @@ end
 
 -- Dibuja el fondo cubriendo todo el canvas interno.
 function Background.draw()
+    -- El canvas crece con la ventana, asi que el shader necesita su tamano real.
+    shader:send("uRes", { Screen.w, Screen.h })
     shader:send("uTime", time)
     shader:send("uColA", colA)
     shader:send("uColB", colB)
@@ -73,7 +74,7 @@ function Background.draw()
 
     love.graphics.setShader(shader)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.rectangle("fill", 0, 0, Config.CANVAS_W, Config.CANVAS_H)
+    love.graphics.rectangle("fill", 0, 0, Screen.w, Screen.h)
     love.graphics.setShader()
 end
 

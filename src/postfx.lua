@@ -1,7 +1,6 @@
 -- Cadena de postprocesado: bloom (bright pass + blur separable) y CRT.
 -- Se aplica al volcar el canvas interno a la ventana.
 
-local Config   = require("src.config")
 local Screen   = require("src.screen")
 local Settings = require("src.settings")
 
@@ -15,19 +14,27 @@ function Postfx.load()
     shaders.blur   = love.graphics.newShader("assets/shaders/blur.glsl")
     shaders.crt    = love.graphics.newShader("assets/shaders/crt.glsl")
 
-    -- Canvases de bloom a media resolución, con filtro lineal para que el
-    -- desenfoque sea suave (aquí sí queremos interpolación).
-    bloomA = love.graphics.newCanvas(Config.BLOOM_W, Config.BLOOM_H)
-    bloomB = love.graphics.newCanvas(Config.BLOOM_W, Config.BLOOM_H)
-    bloomA:setFilter("linear", "linear")
-    bloomB:setFilter("linear", "linear")
+    Postfx.resize(Screen.w, Screen.h)
+    Screen.onResize(Postfx.resize)
 
     -- Textura negra de 1x1 para cuando el bloom está desactivado.
     local data = love.image.newImageData(1, 1)
     data:setPixel(0, 0, 0, 0, 0, 1)
     blackPixel = love.graphics.newImage(data)
 
-    shaders.crt:send("uCanvasRes", { Config.CANVAS_W, Config.CANVAS_H })
+end
+
+-- El canvas cambia de tamaño con la ventana, así que el bloom y las scanlines
+-- tienen que seguirlo.
+local bloomW, bloomH = 1, 1
+function Postfx.resize(w, h)
+    bloomW = math.max(1, math.floor(w / 2))
+    bloomH = math.max(1, math.floor(h / 2))
+    bloomA = love.graphics.newCanvas(bloomW, bloomH)
+    bloomB = love.graphics.newCanvas(bloomW, bloomH)
+    bloomA:setFilter("linear", "linear")
+    bloomB:setFilter("linear", "linear")
+    if shaders.crt then shaders.crt:send("uCanvasRes", { w, h }) end
 end
 
 -- Genera el canvas de bloom a partir de la escena.
@@ -45,7 +52,7 @@ local function buildBloom(scene)
     shaders.bright:send("uKnee", 0.25)
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.draw(scene, 0, 0, 0,
-        Config.BLOOM_W / Config.CANVAS_W, Config.BLOOM_H / Config.CANVAS_H)
+        bloomW / Screen.w, bloomH / Screen.h)
     scene:setFilter("nearest", "nearest")
 
     -- 2) Desenfoque horizontal y vertical.
@@ -54,12 +61,12 @@ local function buildBloom(scene)
 
     love.graphics.setCanvas(bloomB)
     love.graphics.clear(0, 0, 0, 1)
-    shaders.blur:send("uDir", { 1 / Config.BLOOM_W, 0 })
+    shaders.blur:send("uDir", { 1 / bloomW, 0 })
     love.graphics.draw(bloomA)
 
     love.graphics.setCanvas(bloomA)
     love.graphics.clear(0, 0, 0, 1)
-    shaders.blur:send("uDir", { 0, 1 / Config.BLOOM_H })
+    shaders.blur:send("uDir", { 0, 1 / bloomH })
     love.graphics.draw(bloomB)
 
     love.graphics.setShader()

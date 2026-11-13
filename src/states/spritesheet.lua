@@ -5,6 +5,7 @@
 local Gamestate = require("lib.gamestate")
 local Config    = require("src.config")
 local Palette   = require("src.palette")
+local Screen    = require("src.screen")
 local Fonts     = require("src.fonts")
 local Text      = require("src.ui.text")
 local Panel     = require("src.ui.panel")
@@ -24,9 +25,7 @@ end
 function Sheet:update(dt) t = t + dt end
 
 function Sheet:draw()
-    love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.rectangle("fill", 0, 0, Config.CANVAS_W, Config.CANVAS_H)
-    love.graphics.setColor(1, 1, 1, 1)
+    Screen.scrim(0.5)
 
     Text.outlined("ARTE GENERADO POR CODIGO", 8, 6,
         { font = Fonts.bold, color = Palette.gold, outline = Palette.line })

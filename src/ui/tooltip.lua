@@ -3,7 +3,7 @@
 -- Uso: durante el update, quien detecte un hover llama a Tooltip.set(...).
 -- Al final del draw, Tooltip.draw() pinta el que haya quedado activo.
 
-local Config  = require("src.config")
+local Screen  = require("src.screen")
 local Palette = require("src.palette")
 local Panel   = require("src.ui.panel")
 local Text    = require("src.ui.text")
@@ -56,12 +56,13 @@ function Tooltip.draw()
     h = h + #lines * 10 + #warnLines * 10 + 5
 
     -- Colocación: arriba a la derecha del cursor, pero siempre dentro.
+    local vx, vy, vw, vh = Screen.fullRect()
     local x = math.floor(t.x + 10)
     local y = math.floor(t.y - h - 6)
-    if x + w > Config.CANVAS_W - 4 then x = math.floor(t.x - w - 10) end
-    if x < 4 then x = 4 end
-    if y < 4 then y = math.floor(t.y + 14) end
-    if y + h > Config.CANVAS_H - 4 then y = Config.CANVAS_H - 4 - h end
+    if x + w > vx + vw - 4 then x = math.floor(t.x - w - 10) end
+    if x < vx + 4 then x = vx + 4 end
+    if y < vy + 4 then y = math.floor(t.y + 14) end
+    if y + h > vy + vh - 4 then y = vy + vh - 4 - h end
 
     Panel.draw(x, y, w, h, {
         fill = Palette.hex("#15102a"), border = t.accent or Palette.gold,

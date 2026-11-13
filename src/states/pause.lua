@@ -3,6 +3,7 @@
 local Gamestate = require("lib.gamestate")
 local Config    = require("src.config")
 local Palette   = require("src.palette")
+local Screen    = require("src.screen")
 local Fonts     = require("src.fonts")
 local Text      = require("src.ui.text")
 local Panel     = require("src.ui.panel")
@@ -44,9 +45,7 @@ function Pause:update(dt, mx, my)
 end
 
 function Pause:draw()
-    love.graphics.setColor(0, 0, 0, 0.6)
-    love.graphics.rectangle("fill", 0, 0, Config.CANVAS_W, Config.CANVAS_H)
-    love.graphics.setColor(1, 1, 1, 1)
+    Screen.scrim(0.6)
 
     Panel.draw(PANEL.x, PANEL.y, PANEL.w, PANEL.h, {
         fill = Palette.panel, border = Palette.gold,

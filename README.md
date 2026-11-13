@@ -62,6 +62,8 @@ love . --state game --seed 5 --autoplay 300   # partida simulada, para revisar e
 love . --state game --until promotion         # simula hasta llegar a esa fase
 love . --state game --clicks                  # prueba la secuencia de clicks y la informa
 love . --state game --bot                     # un bot juega solo por la interfaz real
+love . --info                                 # diagnóstico de resolución y escalado
+love . --size 1600x900                        # fuerza el tamaño de ventana
 ```
 
 ### Pruebas de las reglas
@@ -163,8 +165,16 @@ tests/
 - **La lógica no espera.** `Match` recibe acciones, muta su estado y emite una
   cola de eventos (`pieceMoved`, `pieceCaptured`, `kingCrowned`...). La capa
   visual consume esa cola animándola paso a paso, con pausas.
-- **Todo se dibuja en 640x360** y se escala a la ventana con un factor entero y
-  filtro `nearest`. Nada de posiciones fraccionarias en la UI.
+- **Caja de diseño de 640x360, canvas elástico.** Toda la interfaz se coloca
+  dentro de una caja fija de 640x360. El canvas sobre el que se dibuja, en
+  cambio, crece hasta cubrir la ventana entera al mayor factor de escala
+  **entero** que permita seguir viendo la caja completa. La caja queda centrada
+  y el sobrante lo ocupa el fondo animado.
+
+  Así el juego llena la pantalla sea cual sea su forma — una columna estrecha
+  en un gestor con mosaico, una ultrapanorámica, lo que sea — sin barras negras
+  y sin renunciar al escalado entero, que es lo que mantiene nítido el pixel
+  art. `love . --info` imprime el reparto que ha calculado.
 - **No hay imágenes externas.** Fichas, corona y sombras se generan por código
   en el arranque (`src/ui/sprites.lua`). El arte es 100% original.
 - **No hay archivos de audio.** Todos los sonidos se sintetizan al arrancar

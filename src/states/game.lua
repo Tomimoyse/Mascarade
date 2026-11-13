@@ -684,9 +684,7 @@ local function drawCoin()
     local cx, cy = LY.cellCenter(4.5, 4.5)
 
     local fade = math.min(p * 4, 1)
-    love.graphics.setColor(0, 0, 0, 0.7 * fade)
-    love.graphics.rectangle("fill", 0, 0, Config.CANVAS_W, Config.CANVAS_H)
-    love.graphics.setColor(1, 1, 1, 1)
+    Screen.scrim(0.7 * fade)
 
     Panel.draw(cx - 110, cy - 86, 220, 160, {
         fill = Palette.panel, border = Palette.gold,
@@ -720,9 +718,7 @@ end
 local HAND_OVER = { x = 170, y = 120, w = 300, h = 110 }
 
 local function drawHandoff()
-    love.graphics.setColor(0, 0, 0, 0.72)
-    love.graphics.rectangle("fill", 0, 0, Config.CANVAS_W, Config.CANVAS_H)
-    love.graphics.setColor(1, 1, 1, 1)
+    Screen.scrim(0.72)
 
     local accent = Palette.player[handoff.player]
     Panel.draw(HAND_OVER.x, HAND_OVER.y, HAND_OVER.w, HAND_OVER.h, {
@@ -763,9 +759,7 @@ local function buildPromoButtons()
 end
 
 local function drawPromotion()
-    love.graphics.setColor(0, 0, 0, 0.55)
-    love.graphics.rectangle("fill", 0, 0, Config.CANVAS_W, Config.CANVAS_H)
-    love.graphics.setColor(1, 1, 1, 1)
+    Screen.scrim(0.55)
 
     Panel.draw(PROMO.x, PROMO.y, PROMO.w, PROMO.h, {
         fill = Palette.panel, border = Palette.gold,
@@ -803,9 +797,7 @@ local function buildOverButtons()
 end
 
 local function drawGameOver()
-    love.graphics.setColor(0, 0, 0, 0.6)
-    love.graphics.rectangle("fill", 0, 0, Config.CANVAS_W, Config.CANVAS_H)
-    love.graphics.setColor(1, 1, 1, 1)
+    Screen.scrim(0.6)
 
     local accent = match.winner and Palette.player[match.winner] or Palette.gray
     Panel.draw(OVER.x, OVER.y, OVER.w, OVER.h, {

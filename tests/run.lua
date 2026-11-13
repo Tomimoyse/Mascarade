@@ -731,6 +731,61 @@ test("la sesion local expone la API que espera la interfaz", function()
 end)
 
 ---------------------------------------------------------------------------
+section("Escalado de pantalla")
+---------------------------------------------------------------------------
+
+test("el canvas llena la ventana entera sin barras negras", function()
+    local Screen = require("src.screen")
+    local tamanos = {
+        { 640, 360 }, { 1280, 720 }, { 1920, 1080 }, { 2880, 1800 },
+        { 1352, 1762 }, { 2560, 1080 }, { 800, 1400 }, { 3840, 2160 },
+        { 1366, 768 }, { 1024, 600 },
+    }
+    for _, s in ipairs(tamanos) do
+        local ww, wh = s[1], s[2]
+        local l = Screen.computeLayout(ww, wh, 640, 360)
+        local etiqueta = string.format("%dx%d", ww, wh)
+
+        -- El area dibujada tiene que cubrir la ventana salvo, como mucho,
+        -- el resto que no llega a una unidad de escala entera.
+        local sobraX = ww - l.w * l.scale
+        local sobraY = wh - l.h * l.scale
+        ok(sobraX >= 0 and sobraX < l.scale,
+            etiqueta .. ": sobra horizontal menor que la escala (" .. sobraX .. ")")
+        ok(sobraY >= 0 and sobraY < l.scale,
+            etiqueta .. ": sobra vertical menor que la escala (" .. sobraY .. ")")
+
+        -- La caja de diseno siempre cabe entera dentro del canvas.
+        ok(l.w >= 640 and l.h >= 360, etiqueta .. ": la caja de diseno cabe")
+        ok(l.dx >= 0 and l.dy >= 0, etiqueta .. ": la caja queda dentro")
+        ok(l.scale >= 1, etiqueta .. ": escala valida")
+    end
+end)
+
+test("usa la escala entera mas grande posible", function()
+    local Screen = require("src.screen")
+    eq(Screen.computeLayout(640, 360, 640, 360).scale, 1, "justo la caja: escala 1")
+    eq(Screen.computeLayout(1280, 720, 640, 360).scale, 2, "el doble: escala 2")
+    eq(Screen.computeLayout(1919, 1079, 640, 360).scale, 2, "un pixel menos del triple: 2")
+    eq(Screen.computeLayout(1920, 1080, 640, 360).scale, 3, "el triple exacto: 3")
+    eq(Screen.computeLayout(2880, 1800, 640, 360).scale, 4, "2880x1800: escala 4")
+    eq(Screen.computeLayout(320, 180, 640, 360).scale, 1, "ventana diminuta: nunca baja de 1")
+end)
+
+test("las coordenadas del raton se traducen a la caja de diseno", function()
+    local Screen = require("src.screen")
+    local l = Screen.computeLayout(1352, 1762, 640, 360)
+    -- Reproducimos aqui la conversion de Screen.toCanvas.
+    local function toDesign(x, y)
+        return (x - l.ox) / l.scale - l.dx, (y - l.oy) / l.scale - l.dy
+    end
+    -- El centro de la ventana debe caer en el centro de la caja de diseno.
+    local cx, cy = toDesign(1352 / 2, 1762 / 2)
+    ok(math.abs(cx - 320) <= 1, "centro horizontal (" .. cx .. ")")
+    ok(math.abs(cy - 180) <= 1, "centro vertical (" .. cy .. ")")
+end)
+
+---------------------------------------------------------------------------
 section("Partida completa aleatoria")
 ---------------------------------------------------------------------------
 
