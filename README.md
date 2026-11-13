@@ -14,17 +14,16 @@ Hecho con [LÖVE2D](https://love2d.org/) 11.5 y Lua.
 
 ## Cómo ejecutarlo
 
+Hay dos caminos. El segundo no instala nada en el sistema.
+
+### 1. Con LÖVE instalado
+
 Hace falta LÖVE 11.5.
 
 ```bash
-# Arch / Omarchy
-sudo pacman -S love
-
-# Debian / Ubuntu
-sudo apt install love
-
-# macOS
-brew install --cask love
+sudo pacman -S love          # Arch / Omarchy
+sudo apt install love        # Debian / Ubuntu
+brew install --cask love     # macOS
 ```
 
 Y después, desde la raíz del proyecto:
@@ -32,6 +31,23 @@ Y después, desde la raíz del proyecto:
 ```bash
 love .
 ```
+
+### 2. Con Docker, sin instalar LÖVE
+
+```bash
+./docker/run.sh              # juega
+./docker/run.sh --test       # pasa la suite de reglas
+./docker/run.sh --state game --bot
+```
+
+La primera vez construye la imagen (unos segundos); después arranca al
+instante. El script acepta los mismos argumentos que `love .`.
+
+Qué hace por dentro: imagen base Arch con LÖVE 11.5, acceso a la GPU por
+`/dev/dri`, el socket de Wayland (o X11 como respaldo) y el de PipeWire para el
+sonido. El proyecto se monta en sólo lectura, y las opciones y capturas van a
+`~/.local/share/mascarade-docker`. Usa `--network host`, que hará falta para el
+juego en red local.
 
 ### Banderas de desarrollo
 
@@ -127,6 +143,10 @@ src/
 assets/
   fonts/              Silkscreen y Pixelify Sans (OFL)
   shaders/            background, brightpass, blur, crt (GLSL)
+
+docker/
+  Dockerfile          Imagen con LÖVE 11.5 sobre Arch
+  run.sh              Lanzador: GPU, Wayland/X11, audio y volumen de guardado
 
 locale/es.lua         Todos los textos visibles del juego
 tests/
