@@ -96,6 +96,184 @@ function Sprites.crown()
 end
 
 ---------------------------------------------------------------------------
+-- Glifos de las piezas de ajedrez
+---------------------------------------------------------------------------
+--
+-- Solo se dibuja la silueta con '@'. El contorno de 1 px y la iluminacion
+-- vertical los añade fromArt() por codigo, asi que las siluetas se pueden
+-- retocar sin tener que redibujar bordes a mano.
+-- Hace falta dejar un margen transparente de 1 px para que quepa el contorno.
+
+Sprites.GLYPH_ART = {
+    peon = {
+        "................",
+        "................",
+        "................",
+        ".......@@.......",
+        "......@@@@......",
+        "......@@@@......",
+        ".......@@.......",
+        ".......@@.......",
+        "......@@@@......",
+        ".....@@@@@@.....",
+        "....@@@@@@@@....",
+        "....@@@@@@@@....",
+        "................",
+        "................",
+        "................",
+        "................",
+    },
+    torre = {
+        "................",
+        "................",
+        "..@@...@@...@@..",
+        "..@@@@@@@@@@@@..",
+        "..@@@@@@@@@@@@..",
+        "....@@@@@@@@....",
+        "....@@@@@@@@....",
+        "....@@@@@@@@....",
+        "....@@@@@@@@....",
+        "....@@@@@@@@....",
+        "...@@@@@@@@@@...",
+        "..@@@@@@@@@@@@..",
+        "..@@@@@@@@@@@@..",
+        "................",
+        "................",
+        "................",
+    },
+    caballo = {
+        "................",
+        "................",
+        "......@@@.......",
+        ".....@@@@@@.....",
+        "....@@@@@@@@....",
+        "...@@@@@@@@@@...",
+        "...@@..@@@@@@...",
+        "..@@...@@@@@@...",
+        "..@....@@@@@@...",
+        ".......@@@@@@...",
+        "......@@@@@@@...",
+        ".....@@@@@@@@...",
+        "....@@@@@@@@@@..",
+        "..@@@@@@@@@@@@..",
+        "................",
+        "................",
+    },
+    alfil = {
+        "................",
+        ".......@@.......",
+        "......@@@@......",
+        ".....@@@@@@.....",
+        ".....@@@@@@.....",
+        ".....@@.@@@.....",
+        ".....@@@@@@.....",
+        "......@@@@......",
+        ".......@@.......",
+        "......@@@@......",
+        ".....@@@@@@.....",
+        "....@@@@@@@@....",
+        "...@@@@@@@@@@...",
+        "..@@@@@@@@@@@@..",
+        "................",
+        "................",
+    },
+    reina = {
+        "................",
+        ".......@@.......",
+        "......@@@@......",
+        ".......@@.......",
+        "..@..@@@@@@..@..",
+        "..@@@@@@@@@@@@..",
+        "..@@@@@@@@@@@@..",
+        "...@@@@@@@@@@...",
+        "....@@@@@@@@....",
+        ".....@@@@@@.....",
+        ".....@@@@@@.....",
+        "....@@@@@@@@....",
+        "...@@@@@@@@@@...",
+        "..@@@@@@@@@@@@..",
+        "................",
+        "................",
+    },
+    rey = {
+        "................",
+        ".......@@.......",
+        ".......@@.......",
+        ".....@@@@@@.....",
+        ".......@@.......",
+        ".....@@@@@@.....",
+        "....@@@@@@@@....",
+        "....@@@@@@@@....",
+        ".....@@@@@@.....",
+        ".....@@@@@@.....",
+        "....@@@@@@@@....",
+        "...@@@@@@@@@@...",
+        "..@@@@@@@@@@@@..",
+        "..@@@@@@@@@@@@..",
+        "................",
+        "................",
+    },
+}
+
+-- Convierte una silueta de texto en una imagen con contorno e iluminacion.
+-- opts = { top, base, outline }
+function Sprites.fromArt(art, opts)
+    opts = opts or {}
+    local top     = opts.top or Palette.white
+    local base    = opts.base or Palette.bone
+    local outline = opts.outline or Palette.line
+
+    local h, w = #art, #art[1]
+    local solid = {}
+    local minY, maxY = h, 1
+    for y = 1, h do
+        solid[y] = {}
+        for x = 1, w do
+            local on = art[y]:sub(x, x) == "@"
+            solid[y][x] = on
+            if on then
+                if y < minY then minY = y end
+                if y > maxY then maxY = y end
+            end
+        end
+    end
+
+    local data = love.image.newImageData(w, h)
+    local span = math.max(maxY - minY, 1)
+
+    -- Relleno: mas claro arriba, mas oscuro abajo.
+    for y = 1, h do
+        for x = 1, w do
+            if solid[y][x] then
+                local t = (y - minY) / span
+                local r, g, b = mix(top, base, t)
+                data:setPixel(x - 1, y - 1, r, g, b, 1)
+            end
+        end
+    end
+
+    -- Contorno: todo pixel vacio pegado a uno solido (incluidas diagonales).
+    for y = 1, h do
+        for x = 1, w do
+            if not solid[y][x] then
+                local touching = false
+                for dy = -1, 1 do
+                    for dx = -1, 1 do
+                        local ny, nx = y + dy, x + dx
+                        if solid[ny] and solid[ny][nx] then touching = true end
+                    end
+                end
+                if touching then
+                    data:setPixel(x - 1, y - 1, outline[1], outline[2], outline[3], 1)
+                end
+            end
+        end
+    end
+
+    return finish(data)
+end
+
+---------------------------------------------------------------------------
 -- Carga de todo el atlas procedural
 ---------------------------------------------------------------------------
 
@@ -115,6 +293,16 @@ function Sprites.load()
 
     Sprites.pieceShadow = Sprites.shadow(DISC + 4, 9)
     Sprites.crownIcon   = Sprites.crown()
+
+    -- Glifos de las seis piezas, en hueso claro sobre contorno oscuro.
+    Sprites.glyph = {}
+    for kind, art in pairs(Sprites.GLYPH_ART) do
+        Sprites.glyph[kind] = Sprites.fromArt(art, {
+            top = Palette.hex("#fbf7ec"), base = Palette.hex("#b3a88f"),
+            outline = Palette.line,
+        })
+    end
+    Sprites.GLYPH_SIZE = 16
 
     Sprites.DISC = DISC
 end

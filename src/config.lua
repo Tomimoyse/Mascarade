@@ -41,10 +41,12 @@ Config.CHAIN_LIMIT_BY_KIND = {
     rey     = 1,
 }
 
--- Tablas: si pasan tantos turnos seguidos sin ninguna captura, la partida
--- se declara en tablas. 30 turnos son 15 por jugador: suficiente para que las
--- aperturas largas no disparen tablas por accidente.
-Config.DRAW_TURNS_WITHOUT_CAPTURE = 30
+-- Tablas: si pasan tantos turnos seguidos sin ninguna captura, la partida se
+-- declara en tablas. 60 turnos son 30 por jugador. El numero sale de medir
+-- 300 partidas aleatorias: la primera captura llega en el turno 9 de mediana,
+-- pero el percentil 99 esta en el turno 44, asi que por debajo de 60 se
+-- cortarian aperturas lentas perfectamente validas.
+Config.DRAW_TURNS_WITHOUT_CAPTURE = 60
 
 -- Orden canónico de los tipos de carta (para UI y tests).
 Config.KINDS = { "peon", "torre", "caballo", "alfil", "reina", "rey" }

@@ -45,6 +45,14 @@ function love.load(args)
             shot.delay = tonumber(args[i + 1]) or 1.5
         elseif a == "--state" then
             startState = args[i + 1] or "menu"
+        elseif a == "--autoplay" then
+            require("src.states.game").autoplay = tonumber(args[i + 1]) or 40
+        elseif a == "--clicks" then
+            require("src.states.game").clickTest = true
+        elseif a == "--seed" then
+            require("src.states.game").seed = tonumber(args[i + 1])
+        elseif a == "--until" then
+            require("src.states.game").stopAt = args[i + 1]
         elseif a == "--test" then
             -- Ejecuta la suite de reglas por consola y sale.
             require("tests.run")

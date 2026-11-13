@@ -6,8 +6,9 @@ movimiento de cada ficha lo decide la **carta de disfraz** que juegas sobre ella
 
 Hecho con [LÖVE2D](https://love2d.org/) 11.5 y Lua.
 
-> **Estado: Fase 2 (lógica de las reglas).** El motor gráfico y las reglas
-> completas están listos y probados. La interfaz de partida llega en la Fase 3.
+> **Estado: Fase 3 (representación visual).** La partida ya se juega entera con
+> el ratón. Falta el ciclo completo con relevo entre jugadores y la resolución
+> animada paso a paso (Fase 4), y el pulido (Fase 5).
 
 ---
 
@@ -40,6 +41,10 @@ love . --shot 2.0            # espera 2 s, guarda una captura y sale
 love . --state game --shot 3 # combinables
 love . --test                # ejecuta la suite de reglas y sale
 love . --demo 7 40           # juega una partida por consola (semilla, turnos)
+love . --state spritesheet   # hoja con todo el arte generado por código
+love . --state game --seed 5 --autoplay 300   # partida simulada, para revisar estados
+love . --state game --until promotion         # simula hasta llegar a esa fase
+love . --state game --clicks                  # prueba la secuencia de clicks y la informa
 ```
 
 ### Pruebas de las reglas
@@ -101,7 +106,15 @@ src/
     moves.lua             Movimientos legales por tipo de disfraz
     match.lua             Turnos, acciones, encadenado y fin de partida
   states/             Pantallas: menu, game, options, rules, pause
-  ui/                 Widgets: panel, button, text, layout, sprites, boardview
+  ui/                 Capa visual, sin reglas dentro
+    layout.lua            Reparto del canvas en paneles
+    panel.lua             Paneles pixel con chaflán y sombra
+    text.lua              Texto con contorno y sombra
+    button.lua            Botones con elevación y hundido
+    tooltip.lua           Tooltips que siguen al ratón
+    sprites.lua           Fichas, corona y glifos de ajedrez por código
+    cardview.lua          Cartas: cara, dorso, hueco y volteo
+    boardview.lua         Tablero, casillas, resaltados y fichas
   fx/                 Efectos: background, shake, particles, floatingtext
   audio/              Banco de sonidos y síntesis procedural
 
@@ -133,6 +146,23 @@ tests/
 
 ---
 
+## Cómo se juega con el ratón
+
+1. **Click en una carta** de tu mano. Las cartas que no puedes jugar salen en
+   gris; al pasar el ratón por encima el tooltip dice por qué.
+2. Las **fichas que puede mover esa carta** se marcan con un latido dorado.
+   Click en una de ellas. Si sólo hay una posible, se elige sola.
+3. Los **destinos legales** aparecen en verde, y en rojo los que capturan.
+   Click en uno para jugar.
+
+Click derecho o `ESC` cancela en cualquier punto. Los botones de la derecha
+cubren las acciones que no pasan por una carta: terminar el turno, mover el rey
+coronado gratis y cambiar una carta muerta.
+
+El panel **Cadena del turno** lleva la cuenta de cuántos disfraces de cada tipo
+llevas jugados y cuál no puedes repetir ahora; **Jugadas este turno** muestra las
+cartas que aún no han caído al descarte.
+
 ## Créditos y licencias
 
 - Tipografías **Silkscreen** y **Pixelify Sans**, licencia SIL Open Font License
@@ -162,6 +192,7 @@ para cerrar huecos. Están marcadas aquí para que queden explícitas:
   descartar una carta cuyo disfraz no tenga ningún movimiento legal con ninguna
   de tus fichas, y robar una de reemplazo. Evita quedarte atascado con la mano
   llena de cartas injugables.
-- **Tablas.** Si pasan 30 turnos seguidos (15 por jugador) sin ninguna captura,
-  la partida se declara en tablas. El número está en
-  `Config.DRAW_TURNS_WITHOUT_CAPTURE`.
+- **Tablas.** Si pasan 60 turnos seguidos (30 por jugador) sin ninguna captura,
+  la partida se declara en tablas. El número sale de medir 300 partidas
+  aleatorias: la primera captura llega en el turno 9 de mediana, pero el
+  percentil 99 está en el turno 44. Está en `Config.DRAW_TURNS_WITHOUT_CAPTURE`.

@@ -76,10 +76,11 @@ function BoardView.highlight(col, row, style, phase)
     love.graphics.setColor(1, 1, 1, 1)
 end
 
--- Dibuja una ficha. opts = { scale, lift, alpha, selected }
-function BoardView.drawPiece(piece, opts)
+-- Dibuja una ficha en una posición arbitraria del canvas (en píxeles).
+-- Separar posición y casilla permite animar el desplazamiento.
+-- opts = { scale, lift, alpha, tint }
+function BoardView.drawPieceAt(piece, cx, cy, opts)
     opts = opts or {}
-    local cx, cy = L.cellCenter(piece.col, piece.row)
     local lift  = opts.lift or 0
     local scale = opts.scale or 1
     local alpha = opts.alpha or 1
@@ -88,25 +89,33 @@ function BoardView.drawPiece(piece, opts)
 
     -- Sombra en el suelo: no se eleva con la ficha, se encoge.
     local sh = Sprites.pieceShadow
-    local shw, shh = sh:getWidth(), sh:getHeight()
     local shrink = 1 - math.min(lift / 14, 0.35)
     love.graphics.setColor(1, 1, 1, alpha * 0.9)
     love.graphics.draw(sh, math.floor(cx), math.floor(cy) + 8, 0,
-        shrink, shrink, shw / 2, shh / 2)
+        shrink, shrink, sh:getWidth() / 2, sh:getHeight() / 2)
 
-    -- Ficha
-    love.graphics.setColor(1, 1, 1, alpha)
+    if opts.tint then
+        love.graphics.setColor(opts.tint[1], opts.tint[2], opts.tint[3], alpha)
+    else
+        love.graphics.setColor(1, 1, 1, alpha)
+    end
     love.graphics.draw(img, math.floor(cx), math.floor(cy - lift), 0,
         scale, scale, d / 2, d / 2)
 
-    -- Corona del rey coronado
     if piece.isKing then
         local cr = Sprites.crownIcon
+        love.graphics.setColor(1, 1, 1, alpha)
         love.graphics.draw(cr, math.floor(cx), math.floor(cy - lift - 9), 0,
             1, 1, cr:getWidth() / 2, cr:getHeight() / 2)
     end
 
     love.graphics.setColor(1, 1, 1, 1)
+end
+
+-- Variante que coloca la ficha en el centro de su casilla.
+function BoardView.drawPiece(piece, opts)
+    local cx, cy = L.cellCenter(piece.col, piece.row)
+    BoardView.drawPieceAt(piece, cx, cy, opts)
 end
 
 -- Dibuja el tablero completo con una lista de fichas.
