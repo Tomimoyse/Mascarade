@@ -56,6 +56,11 @@ Game.bot       = false   -- juega solo a traves de la propia interfaz
 local session, match, seq
 local t = 0
 
+-- En hotseat "mi jugador" es siempre el que tiene el turno. En red es fijo:
+-- yo soy siempre el mismo, y a veces me toca esperar.
+local me      = 1      -- jugador que mira esta pantalla
+local myTurn  = true   -- puedo actuar ahora mismo
+
 local sel   = { cardId = nil, pieceId = nil, kingMove = false, deadMode = false }
 local hover = { cardId = nil, pieceId = nil, col = nil, row = nil }
 
@@ -97,8 +102,30 @@ local function clearSelection()
 end
 
 -- Mientras se reproduce una animación o hay una superposición, no se juega.
+local function refreshWho()
+    me = session:localPlayer() or match.current
+    myTurn = (match.current == me) and session:controls(match.current)
+end
+
 local function locked()
-    return seq:busy() or handoff.active or coin.active
+    return seq:busy() or handoff.active or coin.active or not myTurn
+end
+
+-- Mi mano: en red siempre la mia, aunque el turno sea del rival.
+local function myHand()
+    return match.players[me].hand
+end
+
+-- ¿Se puede ver la mano del jugador de esta pantalla? Durante el relevo
+-- hotseat y el cara o cruz esta tapada.
+local function handVisible()
+    return not handoff.active and not coin.active
+end
+
+-- Las consultas de jugabilidad (que cartas valen, cuales estan muertas) solo
+-- tienen sentido cuando el motor esta mirando mi mano.
+local function canInspect()
+    return handVisible() and match.current == me and match.phase == "action"
 end
 
 local function activeDestinations()
@@ -125,14 +152,12 @@ end
 
 local function deadSet()
     local set = {}
+    if not canInspect() then return set end
     for _, c in ipairs(match:getDeadCards()) do set[c.id] = true end
     return set
 end
 
 -- ¿Se puede ver la mano del jugador activo? Durante el relevo está tapada.
-local function handVisible()
-    return not handoff.active and not coin.active
-end
 
 ---------------------------------------------------------------------------
 -- Reproducción de eventos
@@ -249,6 +274,17 @@ local function playEvent(ev)
     elseif ev.t == "turnEnd" then
         return 0.15
 
+    elseif ev.t == "rechazada" then
+        -- El anfitrion ha rechazado nuestra jugada.
+        Audio.play("error")
+        Fx.popup(L.motivos[ev.reason] or L.motivos.ilegal,
+            Config.CANVAS_W / 2, 150, { color = Palette.red, font = Fonts.small })
+        return 0.3
+
+    elseif ev.t == "rivalDesconectado" then
+        Audio.play("defeat")
+        return 0.2
+
     elseif ev.t == "gameOver" then
         Fx.shake.add(0.7)
         Audio.play(ev.winner and "victory" or "defeat")
@@ -344,7 +380,7 @@ function Game:enter(_previous, newSession)
     vis.pieces, vis.cards, vis.dying = {}, {}, {}
     clearSelection()
     handoff.active, coin.active = false, false
-    promoButtons, overButtons = {}, {}
+    promoButtons, overButtons, discButton = {}, {}, nil
     t = 0
 
     buildButtons()
@@ -364,9 +400,12 @@ end
 
 function Game:update(dt, mx, my)
     t = t + dt
-    match = session:view()
-
     session:update(dt)
+
+    local v = session:view()
+    if not v then return end     -- el cliente aun no ha recibido la primera foto
+    match = v
+    refreshWho()
     seq:push(session:poll())
     seq:update(dt)
 
@@ -378,7 +417,7 @@ function Game:update(dt, mx, my)
     -- ¿Qué hay bajo el ratón?
     hover.cardId, hover.pieceId, hover.col, hover.row = nil, nil, nil, nil
     if not locked() then
-        local hand = match:currentPlayer().hand
+        local hand = myHand()
         for i = #hand, 1, -1 do
             local x, y = LY.handSlot(i, #hand)
             local v = cardVisual(hand[i].id)
@@ -399,7 +438,7 @@ function Game:update(dt, mx, my)
     end
 
     -- Animación de la mano.
-    for _, card in ipairs(match:currentPlayer().hand) do
+    for _, card in ipairs(myHand()) do
         local v = cardVisual(card.id)
         local wantLift = 0
         if handVisible() then
@@ -434,6 +473,9 @@ function Game:update(dt, mx, my)
     for _, b in ipairs(promoButtons) do b:update(dt, mx, my) end
     for _, b in ipairs(overButtons) do b:update(dt, mx, my) end
     if handoff.active then handoffButton:update(dt, mx, my) end
+    if discButton and session:status() == "disconnected" then
+        discButton:update(dt, mx, my)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -616,7 +658,8 @@ local function drawActions()
         highlight = Palette.panelLight, radius = 3, shadowOffset = 3,
     })
     local hint = ""
-    if locked() then hint = "..."
+    if not myTurn and match.phase ~= "gameover" then hint = L.red.turnoRival
+    elseif locked() then hint = "..."
     elseif sel.deadMode then hint = L.partida.eligeMuerta
     elseif sel.kingMove or (sel.cardId and sel.pieceId) then hint = L.partida.eligeDestino
     elseif sel.cardId then hint = L.partida.eligeFicha end
@@ -633,9 +676,9 @@ local function drawHand()
         highlight = nil, radius = 3, shadowOffset = 0,
     })
 
-    local hand = match:currentPlayer().hand
-    local inspect = handVisible() and match:inspectHand() or nil
-    local dead = handVisible() and deadSet() or {}
+    local hand = myHand()
+    local inspect = canInspect() and match:inspectHand() or nil
+    local dead = deadSet()
 
     for i, card in ipairs(hand) do
         local x, y = LY.handSlot(i, #hand)
@@ -646,7 +689,7 @@ local function drawHand()
             -- Durante el relevo la mano del jugador entrante está tapada.
             CardView.drawBack(x, y + idle, {})
         else
-            local playable = inspect[i] and inspect[i].ok
+            local playable = (inspect == nil) or (inspect[i] and inspect[i].ok)
             CardView.draw(card.kind, x, y - v.lift + idle, {
                 selected = (sel.cardId == card.id),
                 disabled = not playable and not (sel.deadMode and dead[card.id]),
@@ -661,7 +704,7 @@ local function drawHand()
         end
     end
 
-    local rival = match:opponentOf(match.current)
+    local rival = match:opponentOf(me)
     local n = #match.players[rival].hand
     local rx = h.x + h.w - 112
     Text.outlined(string.format("%s J%d", L.partida.mano, rival), rx, h.y + 10,
@@ -713,6 +756,44 @@ local function drawCoin()
             { font = Fonts.boldBig, color = Palette.player[coin.winner],
               outline = Palette.line, shadow = 2, alpha = (p - 0.85) / 0.15 })
     end
+end
+
+-- Mientras juega el rival (solo en red): aviso discreto sobre el tablero.
+local function drawWaiting()
+    local b = LY.board
+    local y = b.y + b.h + 2
+    local texto = L.red.turnoRival
+    local w = Fonts.bold:getWidth(texto) + 16
+    local x = b.x + (b.w - w) / 2
+    Panel.draw(x, y, w, 16, {
+        fill = Palette.panelDark, border = Palette.player[match.current],
+        highlight = nil, radius = 2, shadowOffset = 2,
+    })
+    local a = 0.55 + 0.45 * math.sin(t * 3)
+    Text.centered(texto, x, y + 4, w, { font = Fonts.bold,
+        color = Palette.player[match.current], outline = Palette.line, alpha = a })
+end
+
+local DISC = { x = 180, y = 110, w = 280, h = 100 }
+local discButton
+
+local function drawDisconnected()
+    Screen.scrim(0.72)
+    Panel.draw(DISC.x, DISC.y, DISC.w, DISC.h, {
+        fill = Palette.panel, border = Palette.red,
+        highlight = Palette.panelLight, radius = 3, shadowOffset = 4,
+    })
+    Text.centered(L.red.desconectado, DISC.x, DISC.y + 18, DISC.w,
+        { font = Fonts.bold, color = Palette.red, outline = Palette.line, shadow = 2 })
+    if not discButton then
+        discButton = Button({
+            label = L.fin.menu, accent = Palette.gray,
+            x = DISC.x + 40, y = DISC.y + 56, w = DISC.w - 80, h = 20,
+            onClick = function() Gamestate.switch(require("src.states.menu")) end,
+            sound = "back",
+        })
+    end
+    discButton:draw()
 end
 
 local HAND_OVER = { x = 170, y = 120, w = 300, h = 110 }
@@ -783,12 +864,16 @@ local OVER = { x = 200, y = 100, w = 240, h = 128 }
 
 local function buildOverButtons()
     overButtons = {}
-    overButtons[1] = Button({
-        label = L.fin.reiniciar, accent = Palette.green,
-        x = OVER.x + 20, y = OVER.y + 70, w = 200, h = 20,
-        onClick = function() Game:enter() end,
-    })
-    overButtons[2] = Button({
+    -- La revancha solo tiene sentido en local: en red habria que ponerse de
+    -- acuerdo con el otro jugador, y eso todavia no esta.
+    if session.canRestart and session:canRestart() then
+        overButtons[#overButtons + 1] = Button({
+            label = L.fin.reiniciar, accent = Palette.green,
+            x = OVER.x + 20, y = OVER.y + 70, w = 200, h = 20,
+            onClick = function() Game:enter() end,
+        })
+    end
+    overButtons[#overButtons + 1] = Button({
         label = L.fin.menu, accent = Palette.gray,
         x = OVER.x + 20, y = OVER.y + 96, w = 200, h = 20,
         onClick = function() Gamestate.switch(require("src.states.menu")) end,
@@ -820,9 +905,9 @@ end
 local function updateTooltip(mx, my)
     if hover.cardId and handVisible() then
         local card, entry
-        local inspect = match:inspectHand()
-        for i, c in ipairs(match:currentPlayer().hand) do
-            if c.id == hover.cardId then card, entry = c, inspect[i] end
+        local inspect = canInspect() and match:inspectHand() or nil
+        for i, c in ipairs(myHand()) do
+            if c.id == hover.cardId then card, entry = c, inspect and inspect[i] end
         end
         if card then
             Tooltip.set(mx, my, {
@@ -860,15 +945,17 @@ end
 
 function Game:draw()
     drawBoard()
-    drawPlayerPanel(LY.panelRival, match:opponentOf(match.current), false)
-    drawPlayerPanel(LY.panelPropio, match.current, true)
+    drawPlayerPanel(LY.panelRival, match:opponentOf(me), match.current ~= me)
+    drawPlayerPanel(LY.panelPropio, me, match.current == me)
     drawChainPanel()
     drawPiles()
     drawPlayed()
     drawActions()
     drawHand()
 
-    if coin.active then
+    if session:status() == "disconnected" then
+        drawDisconnected()
+    elseif coin.active then
         drawCoin()
     elseif handoff.active then
         drawHandoff()
@@ -880,6 +967,10 @@ function Game:draw()
         drawGameOver()
     elseif not locked() then
         updateTooltip(Screen.toCanvas(love.mouse.getPosition()))
+    end
+
+    if not myTurn and match.phase == "action" and session:status() == "playing" then
+        drawWaiting()
     end
 
     Tooltip.draw()
@@ -899,6 +990,10 @@ end
 ---------------------------------------------------------------------------
 
 function Game:mousepressed(mx, my, btn)
+    if session:status() == "disconnected" then
+        if discButton then discButton:mousepressed(mx, my, btn) end
+        return
+    end
     if coin.active then return end
 
     if handoff.active then
@@ -937,9 +1032,9 @@ function Game:mousepressed(mx, my, btn)
             return
         end
         local inspect = match:inspectHand()
-        for i, c in ipairs(match:currentPlayer().hand) do
+        for i, c in ipairs(myHand()) do
             if c.id == hover.cardId then
-                if inspect[i].ok then
+                if inspect[i] and inspect[i].ok then
                     sel.kingMove, sel.pieceId = false, nil
                     sel.cardId = (sel.cardId == c.id) and nil or c.id
                     Audio.play("cardFlip")
@@ -981,6 +1076,7 @@ function Game:mousepressed(mx, my, btn)
 end
 
 function Game:mousereleased(mx, my, btn)
+    if discButton then discButton:mousereleased(mx, my, btn) end
     for _, b in pairs(buttons) do b:mousereleased(mx, my, btn) end
     for _, b in ipairs(promoButtons) do b:mousereleased(mx, my, btn) end
     for _, b in ipairs(overButtons) do b:mousereleased(mx, my, btn) end
@@ -1031,6 +1127,7 @@ function Game:updateBot(dt)
     end
     if seq:busy() or coin.active then return end
     if match.phase == "gameover" then return end
+    if not myTurn then return end       -- en red, esperamos nuestro turno
     if botWait > 0 then return end
     botWait = 0.35
 

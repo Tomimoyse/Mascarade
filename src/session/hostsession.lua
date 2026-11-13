@@ -191,6 +191,12 @@ function HostSession:describe(idx)
     return self.clientName or string.format(L.partida.jugador, idx)
 end
 
+-- Solo una partida local se puede reiniciar desde aqui; en red haria falta
+-- ponerse de acuerdo con el otro jugador.
+function HostSession:canRestart()
+    return false
+end
+
 function HostSession:close()
     if self.announcer then self.announcer:close(); self.announcer = nil end
     if self.transport then

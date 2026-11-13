@@ -6,7 +6,10 @@ return {
     subtitulo = "disfraces sobre un tablero de 8x8",
 
     menu = {
-        jugar    = "Jugar",
+        jugar      = "Jugar",
+        jugarLocal = "Jugar en local",
+        crearRed   = "Crear partida en red",
+        unirseRed  = "Unirse a una partida",
         opciones = "Opciones",
         reglas   = "Reglas",
         salir    = "Salir",

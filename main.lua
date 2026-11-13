@@ -33,6 +33,7 @@ local shot = { active = false, delay = 1.5, timer = 0, taken = false }
 -- porque los gestores con mosaico la redimensionan despues de crearla.
 local info = { active = false, timer = 0, delay = 1.2 }
 local startState = "menu"
+local lobbyMode = nil
 
 -- Llama a un callback del estado actual, si lo tiene definido.
 local function dispatch(name, ...)
@@ -86,6 +87,16 @@ function love.load(args)
             require("src.states.game").stopAt = args[i + 1]
         elseif a == "--bot" then
             require("src.states.game").bot = true
+        elseif a == "--net" then
+            -- "--net host" crea la partida; "--net 192.168.1.5" se une a ella.
+            local destino = args[i + 1]
+            startState = "lobby"
+            if destino == "host" then
+                lobbyMode = "host"
+            else
+                lobbyMode = "join"
+                require("src.states.lobby").autoJoin = destino or "127.0.0.1"
+            end
         elseif a == "--info" then
             info.active = true
         elseif a == "--size" then
@@ -116,7 +127,7 @@ function love.load(args)
         Screen.resize(love.graphics.getDimensions())
     end
 
-    Gamestate.switch(require("src.states." .. startState))
+    Gamestate.switch(require("src.states." .. startState), lobbyMode)
 end
 
 function love.update(dt)

@@ -19,18 +19,22 @@ local t = 0
 
 function Menu:init()
     local cw = Config.CANVAS_W
-    local bw, bh, gap = 150, 20, 6
+    local bw, bh, gap = 170, 20, 5
     local bx = math.floor((cw - bw) / 2)
-    local by = 182
+    local by = 160
 
     local defs = {
-        { label = L.menu.jugar,    accent = Palette.gold,
+        { label = L.menu.jugarLocal, accent = Palette.gold,
           onClick = function() Gamestate.switch(require("src.states.game")) end },
-        { label = L.menu.reglas,   accent = Palette.blue,
+        { label = L.menu.crearRed,   accent = Palette.green,
+          onClick = function() Gamestate.switch(require("src.states.lobby"), "host") end },
+        { label = L.menu.unirseRed,  accent = Palette.green,
+          onClick = function() Gamestate.switch(require("src.states.lobby"), "join") end },
+        { label = L.menu.reglas,     accent = Palette.blue,
           onClick = function() Gamestate.push(require("src.states.rules")) end },
-        { label = L.menu.opciones, accent = Palette.blue,
+        { label = L.menu.opciones,   accent = Palette.blue,
           onClick = function() Gamestate.push(require("src.states.options")) end },
-        { label = L.menu.salir,    accent = Palette.red,
+        { label = L.menu.salir,      accent = Palette.red,
           onClick = function() love.event.quit() end },
     }
 

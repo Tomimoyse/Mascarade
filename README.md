@@ -6,9 +6,9 @@ movimiento de cada ficha lo decide la **carta de disfraz** que juegas sobre ella
 
 Hecho con [LÖVE2D](https://love2d.org/) 11.5 y Lua.
 
-> **Estado: Fase 4 (ciclo completo).** Partida jugable de principio a fin en
-> hotseat, con cara o cruz, relevo con la mano tapada y resolución paso a paso.
-> Lo siguiente es el juego en red local, y después el pulido.
+> **Estado: juego en red local.** Partida completa en hotseat o contra otra
+> persona en la misma red. Lo siguiente es el pulido (animaciones, sonido,
+> feedback) y los extras.
 
 ---
 
@@ -62,6 +62,8 @@ love . --state game --seed 5 --autoplay 300   # partida simulada, para revisar e
 love . --state game --until promotion         # simula hasta llegar a esa fase
 love . --state game --clicks                  # prueba la secuencia de clicks y la informa
 love . --state game --bot                     # un bot juega solo por la interfaz real
+love . --nettest                              # prueba de integración del juego en red
+love . --net host / --net 127.0.0.1           # arranca directamente en red
 love . --info                                 # diagnóstico de resolución y escalado
 love . --size 1600x900                        # fuerza el tamaño de ventana
 ```
@@ -121,6 +123,16 @@ src/
   session/            Frontera entre la interfaz y la partida
     init.lua              Contrato de una sesión
     localsession.lua      Sesión local (hotseat)
+    hostsession.lua       Anfitrión: árbitro y reparto censurado
+    clientsession.lua     Cliente: sólo tiene la foto
+    matchview.lua         Partida reconstruida desde una foto censurada
+
+  net/                Red
+    codec.lua             Serialización sin load()
+    transport.lua         Capa fina sobre ENet, cambiable
+    discovery.lua         Anuncio y búsqueda por broadcast UDP
+    redact.lua            Qué parte del estado ve cada jugador
+    protocol.lua          Vocabulario de los mensajes
 
   game/               Lógica pura de las reglas. Sin love.graphics.
     rng.lua               PRNG determinista (Park-Miller)
@@ -181,6 +193,49 @@ tests/
   (`src/audio/synth.lua`) y se reproducen con variación aleatoria de tono.
 
 ---
+
+## Jugar en red local
+
+En el menú, uno crea la partida y el otro se une.
+
+- **Crear partida en red**: abre el puerto 27960, anuncia la partida en la red
+  local y espera. La pantalla muestra tu IP por si hace falta dictársela.
+- **Unirse a una partida**: busca partidas anunciadas en la red y las lista.
+  Si el broadcast no llega (algunas wifis y cortafuegos lo bloquean), siempre
+  puedes escribir la IP a mano.
+
+Con Docker funciona igual: `docker/run.sh` ya usa `--network host`.
+
+Para probar las dos puntas en una sola máquina:
+
+```bash
+love . --net host          # una terminal
+love . --net 127.0.0.1     # otra terminal
+```
+
+### Cómo está montado, y por qué así
+
+**El anfitrión es el árbitro.** Tiene la única partida de verdad y valida
+todas las acciones contra el motor de reglas, las suyas incluidas. Un cliente
+manipulado no puede jugar fuera de turno ni hacer una jugada ilegal.
+
+**Nadie ve la mano del otro.** Después de cada jugada, el anfitrión recorta
+una foto distinta del estado para cada jugador: su mano sí, la del rival sólo
+como número. Las cartas del rival no salen de la máquina anfitriona, ni
+siquiera cifradas: sencillamente no viajan. Su propia interfaz también mira
+una foto censurada, así que el anfitrión tampoco tiene ventaja.
+
+**La serialización no usa `load()`.** Lo cómodo sería mandar código Lua y
+evaluarlo al recibirlo, pero eso es ejecución de código remoto. `src/net/codec.lua`
+es un analizador explícito que sólo sabe construir datos.
+
+**El transporte está detrás de una interfaz.** Hoy es ENet (que LÖVE ya trae).
+El día que la partida sea por internet, se escribe otro transporte con los
+mismos cuatro métodos y ni las sesiones ni la interfaz se enteran.
+
+```bash
+love . --nettest   # levanta anfitrión y cliente de verdad y juega una partida
+```
 
 ## Cómo se juega con el ratón
 

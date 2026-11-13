@@ -35,6 +35,12 @@ function LocalSession:controls(_)
     return true
 end
 
+-- En hotseat "mi jugador" es siempre el que tiene el turno: la mano que se
+-- ve en pantalla es la de quien va a jugar.
+function LocalSession:localPlayer()
+    return self.match.current
+end
+
 function LocalSession:needsHandoff()
     return self.hotseat
 end
@@ -45,6 +51,12 @@ end
 
 function LocalSession:describe(idx)
     return string.format(L.partida.jugador, idx)
+end
+
+-- Solo una partida local se puede reiniciar desde aqui; en red haria falta
+-- ponerse de acuerdo con el otro jugador.
+function LocalSession:canRestart()
+    return true
 end
 
 function LocalSession:close() end
