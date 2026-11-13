@@ -115,6 +115,22 @@ function Match:_pushDiscard(card)
     table.insert(self.discard, 1, card)
 end
 
+-- Las cartas usadas durante el turno no van al descarte de inmediato: se
+-- quedan a la vista en la zona de "jugadas este turno" y caen todas juntas al
+-- cerrar el turno, en orden de uso (la ultima usada queda arriba del todo).
+-- Consecuencia importante: la promocion nunca puede recuperar una carta que
+-- se haya jugado en el turno en curso.
+function Match:_flushPlayed()
+    local played = self.turn and self.turn.played
+    if not played or #played == 0 then return end
+    for i = 1, #played do
+        self:_pushDiscard(played[i])
+    end
+    self:_emit({ t = "playedDiscarded", player = self.current,
+                 cards = played, count = #played })
+    self.turn.played = {}
+end
+
 -- Roba hasta n cartas respetando el límite de mano.
 function Match:_drawCards(playerIdx, n)
     local player = self.players[playerIdx]
@@ -163,6 +179,7 @@ function Match:_startTurn(playerIdx)
         deadDiscardUsed = false,  -- válvula de carta muerta (1 por turno)
         captured        = false,  -- ¿se ha comido algo este turno?
         pendingPromotion = nil,
+        played          = {},     -- cartas usadas este turno, en orden de uso
     }
     self.phase = "action"
     self:_emit({ t = "turnStart", player = playerIdx, number = self.turnNumber })
@@ -173,6 +190,7 @@ function Match:_finishTurn(drawCount)
     if drawCount and drawCount > 0 then
         self:_drawCards(self.current, drawCount)
     end
+    self:_flushPlayed()
     self:_emit({ t = "turnEnd", player = self.current })
 
     if self.turn.captured then
@@ -188,6 +206,7 @@ function Match:_finishTurn(drawCount)
 end
 
 function Match:_gameOver(winner, reason)
+    self:_flushPlayed()
     self.phase  = "gameover"
     self.winner = winner
     self.result = reason
@@ -343,6 +362,12 @@ function Match:getDeadCards()
         end
     end
     return out
+end
+
+-- Cartas usadas en el turno en curso, en orden de uso. Todavía no están en
+-- el descarte: la interfaz las muestra en su propia zona.
+function Match:getPlayedThisTurn()
+    return self.turn and self.turn.played or {}
 end
 
 -- Cuántas cartas robaría el jugador si terminase el turno ahora.
@@ -512,7 +537,7 @@ function handlers.playCard(self, action)
     local wasKing = piece.isKing
 
     table.remove(player.hand, handIndex)
-    self:_pushDiscard(card)
+    table.insert(self.turn.played, card)
     self:_emit({ t = "cardPlayed", player = self.current, card = card,
                  pieceId = piece.id })
 

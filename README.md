@@ -143,6 +143,16 @@ tests/
 
 ---
 
+## Detalle de implementación: el descarte es diferido
+
+Las cartas que juegas **no** van al descarte en el momento. Se quedan a la vista
+en una zona de "jugadas este turno" y caen todas juntas al descarte al cerrar el
+turno, apiladas en orden de uso (la última usada queda arriba).
+
+Esto importa para la promoción: la carta que acabas de usar para llegar a la
+última fila **no** está todavía en el descarte, así que la promoción solo puede
+recuperar cartas de turnos anteriores.
+
 ## Reglas de la casa
 
 Dos reglas que **no** están en el documento de diseño original y se añadieron

@@ -57,6 +57,8 @@ local function describe(ev)
     elseif ev.t == "drew" then
         if ev.count == 0 then return nil end
         return string.format("    roba %d carta(s)", ev.count)
+    elseif ev.t == "playedDiscarded" then
+        return string.format("    (%d carta(s) usadas van al descarte)", ev.count)
     elseif ev.t == "deckReshuffled" then
         return string.format("    [mazo rebarajado con %d cartas del descarte]", ev.count)
     elseif ev.t == "gameOver" then

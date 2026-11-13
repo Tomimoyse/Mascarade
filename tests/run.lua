@@ -381,8 +381,6 @@ section("Promocion")
 ---------------------------------------------------------------------------
 
 test("llegar a la ultima fila permite cambiar un peon por una no-peon", function()
-    -- La carta que acaba de jugarse ya esta en la cima del descarte, asi que
-    -- es la primera candidata: moviendo con torre, se recupera esa torre.
     local m, p = H.scenario({
         pieces = { { owner = 1, col = 4, row = 2, name = "a", moved = true } },
         hands = { [1] = { "torre", "peon" } },
@@ -391,24 +389,25 @@ test("llegar a la ultima fila permite cambiar un peon por una no-peon", function
     ok(H.play(m, "torre", p.a, 4, 1), "la torre llega a la fila 1")
     eq(m.phase, "promotion", "se abre la fase de promocion")
     local reward = m:getPromotionReward()
-    eq(reward.kind, "torre", "la recompensa es la no-peon mas alta del descarte")
+    eq(reward.kind, "alfil", "la recompensa se salta los peones del descarte")
 
     ok(m:apply({ type = "promote", cardId = H.card(m, 1, "peon").id }), "promociona")
     eq(#m.players[1].hand, 1, "la mano mantiene su tamano")
-    eq(m.players[1].hand[1].kind, "torre", "ha recuperado la torre")
+    eq(m.players[1].hand[1].kind, "alfil", "ha ganado el alfil")
     eq(m.current, 2, "el turno termina: el movimiento no comio")
 end)
 
-test("moviendo con un peon se salta su propio descarte y coge la de abajo", function()
+test("la promocion no puede recuperar una carta jugada en el turno en curso", function()
+    -- La torre jugada este turno sigue en la zona de jugadas, no en el descarte.
     local m, p = H.scenario({
         pieces = { { owner = 1, col = 4, row = 2, name = "a", moved = true } },
-        hands = { [1] = { "peon", "peon" } },
-        discard = { "peon", "alfil", "reina" },
+        hands = { [1] = { "torre", "peon" } },
+        discard = { "peon", "alfil" },
     })
-    ok(H.play(m, "peon", p.a, 4, 1), "avanza con un peon hasta la fila 1")
-    eq(m:getPromotionReward().kind, "alfil", "se salta todos los peones del descarte")
-    ok(m:apply({ type = "promote", cardId = H.card(m, 1, "peon").id }), "promociona")
-    eq(m.players[1].hand[1].kind, "alfil", "ha ganado el alfil")
+    ok(H.play(m, "torre", p.a, 4, 1), "llega a la fila 1 con la torre")
+    eq(#m:getPlayedThisTurn(), 1, "la torre esta en la zona de jugadas")
+    eq(#m.discard, 2, "el descarte no la ha recibido todavia")
+    eq(m:getPromotionReward().kind, "alfil", "la recompensa es la del descarte previo")
 end)
 
 test("la promocion es opcional", function()
@@ -437,10 +436,10 @@ end)
 test("sin cartas no-peon en el descarte no hay promocion", function()
     local m, p = H.scenario({
         pieces = { { owner = 1, col = 4, row = 2, name = "a", moved = true } },
-        hands = { [1] = { "peon", "peon" } },
+        hands = { [1] = { "torre", "peon" } },
         discard = { "peon", "peon" },
     })
-    ok(H.play(m, "peon", p.a, 4, 1), "llega a la ultima fila con un peon")
+    ok(H.play(m, "torre", p.a, 4, 1), "llega a la ultima fila")
     eq(m.phase, "action", "la promocion no esta disponible")
 end)
 
@@ -469,6 +468,46 @@ test("la promocion no gasta la accion: se puede seguir encadenando", function()
     ok(m:apply({ type = "promote", cardId = H.card(m, 1, "peon").id }), "promociona")
     eq(m.current, 1, "conserva el turno")
     ok(H.hasEvent(m:drainEvents(), "extraAction"), "y su accion extra")
+end)
+
+---------------------------------------------------------------------------
+section("Descarte diferido")
+---------------------------------------------------------------------------
+
+test("las cartas usadas caen al descarte al cerrar el turno, en orden de uso", function()
+    local m, p = H.scenario({
+        pieces = {
+            { owner = 1, col = 1, row = 8, name = "a" },
+            { owner = 2, col = 1, row = 5, name = "v1" },
+            { owner = 2, col = 4, row = 5, name = "v2" },
+            { owner = 2, col = 8, row = 8, name = "escolta" },
+        },
+        hands = { [1] = { "reina", "torre" } },
+    })
+    ok(H.play(m, "reina", p.a, 1, 5), "juega la reina y come")
+    eq(#m.discard, 0, "el descarte sigue vacio")
+    eq(#m:getPlayedThisTurn(), 1, "la reina esta en la zona de jugadas")
+
+    ok(H.play(m, "torre", p.a, 4, 5), "juega la torre y come")
+    eq(#m.discard, 0, "el descarte sigue vacio")
+    eq(#m:getPlayedThisTurn(), 2, "ahora hay dos cartas jugadas")
+
+    ok(m:apply({ type = "endTurn" }), "cierra el turno")
+    eq(#m.discard, 2, "las dos cartas caen juntas al descarte")
+    eq(m.discard[1].kind, "torre", "la ultima usada queda arriba")
+    eq(m.discard[2].kind, "reina", "y la primera debajo")
+    eq(#m:getPlayedThisTurn(), 0, "la zona de jugadas queda limpia")
+end)
+
+test("un movimiento sin captura tambien vuelca su carta al descarte", function()
+    local m, p = H.scenario({
+        pieces = { { owner = 1, col = 4, row = 5, name = "a", moved = true },
+                   { owner = 2, col = 1, row = 1, name = "rival" } },
+        hands = { [1] = { "torre" } },
+    })
+    ok(H.play(m, "torre", p.a, 4, 4), "mueve sin comer: el turno termina solo")
+    eq(#m.discard, 1, "la carta ya esta en el descarte")
+    eq(m.discard[1].kind, "torre", "y es la torre")
 end)
 
 ---------------------------------------------------------------------------
