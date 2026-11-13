@@ -83,6 +83,31 @@ return {
         empieza = "Empieza el %s",
     },
 
+    red = {
+        titulo       = "Jugar en red",
+        crear        = "Crear partida",
+        unirse       = "Unirse a una partida",
+        local_       = "Jugar en local",
+        partidaDe    = "Partida de Mascarade",
+        invitado     = "Invitado",
+        tu           = "Tu",
+        esperando    = "Esperando a un rival...",
+        tuIP         = "Tu IP en esta red: %s",
+        puerto       = "Puerto: %d",
+        buscando     = "Buscando partidas en la red...",
+        ningunaAun   = "Ninguna partida encontrada todavia",
+        conectando   = "Conectando con %s...",
+        conectado    = "Conectado",
+        sinRespuesta = "El anfitrion no responde",
+        desconectado = "El rival se ha desconectado",
+        turnoRival   = "Turno del rival...",
+        ipManual     = "O escribe la IP:",
+        volver       = "Volver",
+        cancelar     = "Cancelar",
+        empezar      = "Empezar",
+        comoJugar    = "Los dos tenemos que estar en la misma red",
+    },
+
     motivos = {
         mismoDisfrazSeguido = "No puedes repetir disfraz seguido",
         limiteDeTipo        = "Ya has agotado este disfraz este turno",
@@ -93,6 +118,11 @@ return {
         sinRey              = "Todavia no has coronado",
         cartaNoMuerta       = "Esta carta si tiene movimientos",
         yaUsado             = "Ya has cambiado una carta este turno",
+        noEsTuTurno         = "No es tu turno",
+        sinConexion         = "Sin conexion con el anfitrion",
+        sinPartida          = "La partida no ha empezado",
+        partidaRemota       = "La partida la lleva el anfitrion",
+        ilegal              = "Jugada no permitida",
     },
 
     cartas = {

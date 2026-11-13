@@ -42,8 +42,36 @@ local function dispatch(name, ...)
 end
 
 function love.load(args)
-    for i, a in ipairs(args or {}) do
-        if a == "--shot" then
+    args = args or {}
+
+    -- Modos de consola: hacen su trabajo y salen, sin abrir el juego.
+    -- Van en pcall para que un fallo salga por la terminal en vez de abrir la
+    -- pantalla de error de LOVE, que aqui se quedaria esperando para siempre.
+    local function consola(fn)
+        io.stdout:setvbuf("line")
+        local ok, res = pcall(fn)
+        if not ok then
+            print("ERROR: " .. tostring(res))
+            love.event.quit(1)
+        else
+            love.event.quit(tonumber(res) or 0)
+        end
+    end
+
+    for i, a in ipairs(args) do
+        if a == "--test" then
+            return consola(function() require("tests.run") end)
+
+        elseif a == "--nettest" then
+            return consola(function() return require("tests.nettest")() end)
+
+        elseif a == "--demo" then
+            return consola(function()
+                _G.arg = { args[i + 1], args[i + 2] }
+                require("tests.demo")
+            end)
+
+        elseif a == "--shot" then
             shot.active = true
             shot.delay = tonumber(args[i + 1]) or 1.5
         elseif a == "--state" then
