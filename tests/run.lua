@@ -650,6 +650,87 @@ test("una captura reinicia el contador de tablas", function()
 end)
 
 ---------------------------------------------------------------------------
+section("Secuenciador de eventos")
+---------------------------------------------------------------------------
+
+test("reproduce los eventos de uno en uno respetando las pausas", function()
+    local Sequencer = require("src.ui.sequencer")
+    local visto = {}
+    local seq = Sequencer(function(ev)
+        visto[#visto + 1] = ev.t
+        return ev.t == "lento" and 0.5 or 0
+    end)
+
+    seq:push({ { t = "rapido" }, { t = "lento" }, { t = "rapido2" } })
+    ok(seq:busy(), "arranca ocupado")
+
+    seq:update(0)
+    eq(#visto, 2, "procesa hasta el primero que pide esperar")
+    eq(visto[2], "lento", "y ese es el lento")
+
+    seq:update(0.2)
+    eq(#visto, 2, "durante la pausa no avanza")
+
+    seq:update(0.4)
+    eq(#visto, 3, "al vencer la pausa sigue")
+    ok(not seq:busy(), "y queda libre")
+end)
+
+test("un evento puede bloquear hasta que alguien lo reanuda", function()
+    local Sequencer = require("src.ui.sequencer")
+    local visto = {}
+    local seq = Sequencer(function(ev)
+        visto[#visto + 1] = ev.t
+        return ev.t == "relevo" and "block" or 0
+    end)
+
+    seq:push({ { t = "a" }, { t = "relevo" }, { t = "b" } })
+    seq:update(0)
+    eq(#visto, 2, "se detiene en el bloqueo")
+    ok(seq:isBlocked(), "queda bloqueado")
+
+    seq:update(10)
+    eq(#visto, 2, "el tiempo no lo desbloquea")
+
+    seq:resume()
+    seq:update(0)
+    eq(#visto, 3, "al reanudar continua")
+    ok(not seq:busy(), "y termina")
+end)
+
+test("clear vacia la cola y desbloquea", function()
+    local Sequencer = require("src.ui.sequencer")
+    local seq = Sequencer(function() return "block" end)
+    seq:push({ { t = "x" }, { t = "y" } })
+    seq:update(0)
+    seq:clear()
+    ok(not seq:busy(), "queda libre")
+    ok(not seq:isBlocked(), "y desbloqueado")
+end)
+
+---------------------------------------------------------------------------
+section("Sesion local")
+---------------------------------------------------------------------------
+
+test("la sesion local expone la API que espera la interfaz", function()
+    local LocalSession = require("src.session.localsession")
+    local s = LocalSession({ seed = 42 })
+    local view = s:view()
+    ok(view.board ~= nil, "da acceso al tablero")
+    eq(#view.players[1].hand, 5, "ha repartido")
+    ok(#s:poll() > 0, "entrega los eventos de inicio")
+    eq(#s:poll(), 0, "y no los repite")
+    ok(s:controls(1) and s:controls(2), "en local maneja a los dos")
+    ok(s:needsHandoff(), "en hotseat hace falta relevo")
+    eq(s:status(), "ok", "estado correcto")
+
+    local okReq = s:request({ type = "endTurn" })
+    ok(okReq, "acepta una accion legal")
+    ok(#s:poll() > 0, "y genera eventos")
+    s:close()
+end)
+
+---------------------------------------------------------------------------
 section("Partida completa aleatoria")
 ---------------------------------------------------------------------------
 

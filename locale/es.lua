@@ -71,6 +71,18 @@ return {
         promoNo       = "No promocionar",
     },
 
+    relevo = {
+        titulo = "Cambio de turno",
+        texto  = "Pasa el raton al %s",
+        oculta = "Su mano esta tapada",
+        listo  = "Listo",
+    },
+
+    moneda = {
+        titulo = "Cara o cruz",
+        empieza = "Empieza el %s",
+    },
+
     motivos = {
         mismoDisfrazSeguido = "No puedes repetir disfraz seguido",
         limiteDeTipo        = "Ya has agotado este disfraz este turno",

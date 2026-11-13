@@ -6,9 +6,9 @@ movimiento de cada ficha lo decide la **carta de disfraz** que juegas sobre ella
 
 Hecho con [LÖVE2D](https://love2d.org/) 11.5 y Lua.
 
-> **Estado: Fase 3 (representación visual).** La partida ya se juega entera con
-> el ratón. Falta el ciclo completo con relevo entre jugadores y la resolución
-> animada paso a paso (Fase 4), y el pulido (Fase 5).
+> **Estado: Fase 4 (ciclo completo).** Partida jugable de principio a fin en
+> hotseat, con cara o cruz, relevo con la mano tapada y resolución paso a paso.
+> Lo siguiente es el juego en red local, y después el pulido.
 
 ---
 
@@ -45,6 +45,7 @@ love . --state spritesheet   # hoja con todo el arte generado por código
 love . --state game --seed 5 --autoplay 300   # partida simulada, para revisar estados
 love . --state game --until promotion         # simula hasta llegar a esa fase
 love . --state game --clicks                  # prueba la secuencia de clicks y la informa
+love . --state game --bot                     # un bot juega solo por la interfaz real
 ```
 
 ### Pruebas de las reglas
@@ -99,6 +100,10 @@ src/
   screen.lua          Canvas interno 640x360, escala entera y letterbox
   postfx.lua          Cadena de postprocesado: bloom + CRT
 
+  session/            Frontera entre la interfaz y la partida
+    init.lua              Contrato de una sesión
+    localsession.lua      Sesión local (hotseat)
+
   game/               Lógica pura de las reglas. Sin love.graphics.
     rng.lua               PRNG determinista (Park-Miller)
     cards.lua             Composición del mazo de 32 disfraces
@@ -115,6 +120,7 @@ src/
     sprites.lua           Fichas, corona y glifos de ajedrez por código
     cardview.lua          Cartas: cara, dorso, hueco y volteo
     boardview.lua         Tablero, casillas, resaltados y fichas
+    sequencer.lua         Reproduce los eventos de uno en uno, con pausas
   fx/                 Efectos: background, shake, particles, floatingtext
   audio/              Banco de sonidos y síntesis procedural
 

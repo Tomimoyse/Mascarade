@@ -2,6 +2,7 @@
 -- submódulos directamente, para que sea fácil cambiar implementaciones.
 
 local flux         = require("lib.flux")
+local Timer        = require("lib.timer")
 local Shake        = require("src.fx.shake")
 local Particles    = require("src.fx.particles")
 local FloatingText = require("src.fx.floatingtext")
@@ -9,6 +10,10 @@ local Background   = require("src.fx.background")
 local Palette      = require("src.palette")
 
 local Fx = {}
+
+-- Temporizador propio para efectos diferidos (una explosion a mitad de una
+-- animacion, por ejemplo). Se actualiza junto con el resto de efectos.
+Fx.timer = Timer.new()
 
 Fx.shake        = Shake
 Fx.particles    = Particles
@@ -21,6 +26,7 @@ end
 
 function Fx.update(dt)
     flux.update(dt)
+    Fx.timer:update(dt)
     Shake.update(dt)
     Particles.update(dt)
     Background.update(dt)
@@ -32,7 +38,13 @@ function Fx.drawOver()
     FloatingText.draw()
 end
 
+-- Ejecuta fn dentro de 'delay' segundos.
+function Fx.after(delay, fn)
+    return Fx.timer:after(delay, fn)
+end
+
 function Fx.clear()
+    Fx.timer:clear()
     Shake.reset()
     Particles.clear()
     FloatingText.clear()

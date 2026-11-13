@@ -53,6 +53,8 @@ function love.load(args)
             require("src.states.game").seed = tonumber(args[i + 1])
         elseif a == "--until" then
             require("src.states.game").stopAt = args[i + 1]
+        elseif a == "--bot" then
+            require("src.states.game").bot = true
         elseif a == "--test" then
             -- Ejecuta la suite de reglas por consola y sale.
             require("tests.run")
